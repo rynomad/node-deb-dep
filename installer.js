@@ -1,5 +1,6 @@
 #!/usr/bin/node
 'use strict';
+const clone = require("git-clone")
 const request = require('request')
 const path = process.argv[2] || "."
 const lib_dir = __dirname + "/test/node_modules/"
@@ -19,6 +20,8 @@ const npm_install = (path) => () => new Promise((res, rej) => {
     cwd : path
   })
   installer.on('error', (err) => {
+
+
     rej(err)
   })
   //installer.stdout.pipe(process.stdout)
@@ -40,13 +43,7 @@ var mountfile = fss.createWriteStream(app_dir + "mount.txt")
 const install = (cwd, node, name) => {
   let installpath = lib_dir + name + "/" + node.version.split(".").join("/")
   ++i;
-  if (node.dependencies)
-    Object.keys(node.dependencies).forEach((dep) => {
-      fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
-      fs.mkdirRecursiveSync(installpath + "/" + name + "-" + node.version + "/node_modules/" + dep)
-    })
-  else
-    fs.mkdirRecursiveSync(installpath)
+  fs.mkdirRecursiveSync(installpath)
   console.log("add mount")
   mountpoints.push(cwd)
   mountfile.write(installpath + "/package " + cwd + "\n")
@@ -61,7 +58,7 @@ process.on('exit', (code) => {
   process.exit()
 })
 
-process.on('uncaughtException', (er) => console.log(er))
+process.on('uncaughtException', (er) => console.log(er.stack))
 
 const traverse = (cwd, node, name) => {
   if (name)
@@ -90,12 +87,39 @@ for (var mod of modules){
     let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
     let localH = url.indexOf('http:') === 0 ? require('http') : http
     //console.log("get?")
-    request(url).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
+    if (url.indexOf("git") === 0){
+      let repo = url.split("+")[1]
+      let commit = repo.split("#")[1]
+      repo = repo.split("#")[0]
+      clone(repo, installpath + "/package", {checkout : commit}, postFetch)
+    } else {
+      request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', postFetch).on('error', (err) => {
+      //console.log("er", node.resolved )
+      failures.push("!GET: " + installpath)
+    })
+
+    }
+
+
+
+    function postFetch () {
         //console.log("?", installpath)
         //fs.copyRecursiveSync(installpath + "/package", installpath)
 	try {
-          fss.renameSync(installpath + "/" + name + "-" + node.version, installpath + "/package")
+	 fss.readdirSync(installpath).forEach((path) => {
+	  if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
+            fss.renameSync(installpath + "/" + path, installpath + "/package")
+
+	  }
+         })
+
+
  	} catch(e){}
+          if (node.dependencies)
+           Object.keys(node.dependencies).forEach((dep) => {
+            fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+           })
+
         jsonfile.readFile(installpath + "/package/package.json", (err, json) => {
           if (err){
             return failures.push("READPKG: " + installpath)
@@ -117,10 +141,7 @@ for (var mod of modules){
                  })
           })
         })
-    }).on('error', (err) => {
-      //console.log("er", node.resolved )
-      failures.push("!GET: " + installpath)
-    })
+}
   } catch (e) {
     console.log("<<<", e, name)
   }

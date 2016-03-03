@@ -4,9 +4,9 @@ f=./testapp/mount.txt
 #do
   echo "setting mounts for $file file..."
   # take action on each file. $f store current file name
-  while read mounts ; do 
-    echo $mounts
-    "mount --bind --make-slave $mounts"
-    "mount -o remount,ro,bind $mounts"
+  while read src target ; do 
+#    echo $src $target
+    /bin/mount --bind --make-slave $src $target
+    /bin/mount -o remount,ro,bind $src $target
   done < $f
 #done
