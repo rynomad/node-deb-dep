@@ -1,6 +1,6 @@
 #!/usr/bin/node
 'use strict';
-
+const request = require('request')
 const path = process.argv[2] || "."
 const lib_dir = __dirname + "/test/node_modules/"
 const app_dir = __dirname + "/testapp/"
@@ -22,7 +22,7 @@ const npm_install = (path) => () => new Promise((res, rej) => {
     rej(err)
   })
   //installer.stdout.pipe(process.stdout)
-  installer.stderr.pipe(process.stderr)
+  installer.stderr.on('data',() => {})
   installer.on('close', (code) => {
     if (code)
       rej(code)
@@ -33,9 +33,9 @@ const npm_install = (path) => () => new Promise((res, rej) => {
 let i = 0
 
 var modules = new Map();
+var mountpoints = []
 
-
-var mountfile = fss.createWriteStream(app_dir + "mount")
+var mountfile = fss.createWriteStream(app_dir + "mount.txt")
 
 const install = (cwd, node, name) => {
   let installpath = lib_dir + name + "/" + node.version.split(".").join("/")
@@ -43,21 +43,25 @@ const install = (cwd, node, name) => {
   if (node.dependencies)
     Object.keys(node.dependencies).forEach((dep) => {
       fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+      fs.mkdirRecursiveSync(installpath + "/" + name + "-" + node.version + "/node_modules/" + dep)
     })
   else
     fs.mkdirRecursiveSync(installpath)
-
+  console.log("add mount")
+  mountpoints.push(cwd)
   mountfile.write(installpath + "/package " + cwd + "\n")
-  modules.set(installpath, node)
+  modules.set(installpath, Object.assign(node,{name : name} ))
 }
 
 var failures = []
 
-process.on('exit', () => {
-  console.log("failures")
+process.on('exit', (code) => {
+  console.log("failures", code)
   console.log(failures)
   process.exit()
 })
+
+process.on('uncaughtException', (er) => console.log(er))
 
 const traverse = (cwd, node, name) => {
   if (name)
@@ -74,17 +78,24 @@ console.log(modules.size)
 
 for (var mod of modules){
   let installpath = mod[0]
-    , node = mod[1];
-
+    , node = mod[1]
+    , name = node.name;
   try {
-    require(installpath + "/package/package.json")
+    //console.log("try", modules.size)
+     require(installpath + "/package/package.json")
   } catch (e){
   try {
-    http.get(node.resolved, (res) => {
-      res.pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
+    //console.log("???")
+    let version = node.version.split('.')
+    let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
+    let localH = url.indexOf('http:') === 0 ? require('http') : http
+    //console.log("get?")
+    request(url).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
         //console.log("?", installpath)
         //fs.copyRecursiveSync(installpath + "/package", installpath)
-
+	try {
+          fss.renameSync(installpath + "/" + name + "-" + node.version, installpath + "/package")
+ 	} catch(e){}
         jsonfile.readFile(installpath + "/package/package.json", (err, json) => {
           if (err){
             return failures.push("READPKG: " + installpath)
@@ -98,7 +109,7 @@ for (var mod of modules){
             j++;
             //console.log("queue install", installpath)
             queue.add(npm_install(installpath + "/package"))
-                 .catch((er) => failures.push("INSTALL: " +  installpath))
+                 .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
                  .then(() => {
                   process.stdout.write('.')
                   if (queue.getQueueLength + queue.getPendingLength === 0)
@@ -106,14 +117,12 @@ for (var mod of modules){
                  })
           })
         })
-
-      })
     }).on('error', (err) => {
-      console.log("er", node.resolved )
+      //console.log("er", node.resolved )
       failures.push("!GET: " + installpath)
     })
   } catch (e) {
-    console.log("<<<", node.resolved)
+    console.log("<<<", e, name)
   }
 
 }
@@ -124,3 +133,7 @@ for (var mod of modules){
 
 */
 console.log(i, "mounts")
+var umount = fs.createWriteStream(app_dir + "umount")
+while (mountpoints.length){
+  umount.write(mountpoints.pop() + "\n")
+}
