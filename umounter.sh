@@ -1,11 +1,12 @@
+
 #!/bin/bash
-f=./testapp/umount
-#for file in $FILES
-#do
-  echo "removing mounts for $file file..."
+FILES=/etc/node-deb-dep/mounts/*.mount
+for file in $FILES
+do
+  echo "setting mounts for $file file..."
   # take action on each file. $f store current file name
-  while read mounts ; do 
-#    echo $mounts
+  while read src target ; do 
+#    echo $src $target
     umount $mounts
-  done < $f
-#done
+  done < $file
+done

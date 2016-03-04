@@ -8,5 +8,5 @@ do
 #    echo $src $target
     /bin/mount --bind --make-slave $src $target
     /bin/mount -o remount,ro,bind $src $target
-  done < $f
+  done < $file
 done

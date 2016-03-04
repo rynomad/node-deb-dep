@@ -86,6 +86,7 @@ for (var mod of modules){
   try {
     //console.log("try", modules.size)
      require(installpath + "/package/package.json")
+
   } catch (e){
   try {
     //console.log("???")
@@ -108,46 +109,44 @@ for (var mod of modules){
 
 
 
-    function postFetch () {
-        //console.log("?", installpath)
-        //fs.copyRecursiveSync(installpath + "/package", installpath)
-  	 try {
-  	 fss.readdirSync(installpath).forEach((path) => {
-  	  if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
+      function postFetch () {
+          //console.log("?", installpath)
+          //fs.copyRecursiveSync(installpath + "/package", installpath)
+      	try {
+      	  fss.readdirSync(installpath).forEach((path) => {
+        	  if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
               fss.renameSync(installpath + "/" + path, installpath + "/package")
-
-  	  }
-           })
-
-
-   	 } catch(e){}
-            if (node.dependencies)
-             Object.keys(node.dependencies).forEach((dep) => {
-              fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
-             })
-
-          jsonfile.readFile(installpath + "/package/package.json", (err, json) => {
-            if (err){
-              return failures.push("READPKG: " + installpath)
-            }
-
-            json.dependencies = {};
-            json.devDependencies = {};
-            jsonfile.writeFile(installpath + "/package/package.json", json, (err) => {
-              if (err)
-                return failures.push("WRTPKG: " + installpath)
-              j++;
-              //console.log("queue install", installpath)
-              queue.add(npm_install(installpath + "/package"))
-                   .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
-                   .then(() => {
-                    process.stdout.write('.')
-                    if (queue.getQueueLength + queue.getPendingLength === 0)
-                      process.exit()
-                   })
-            })
+        	  }
           })
-      }
+       	} catch(e){}
+
+        if (node.dependencies){
+          Object.keys(node.dependencies).forEach((dep) => {
+            fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+          })
+        } 
+
+        jsonfile.readFile(installpath + "/package/package.json", (err, json) => {
+          if (err){
+            return failures.push("READPKG: " + installpath)
+          }
+
+          json.dependencies = {};
+          json.devDependencies = {};
+          jsonfile.writeFile(installpath + "/package/package.json", json, (err) => {
+            if (err)
+              return failures.push("WRTPKG: " + installpath)
+            j++;
+            //console.log("queue install", installpath)
+            queue.add(npm_install(installpath + "/package"))
+                 .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
+                 .then(() => {
+                  if (queue.getQueueLength + queue.getPendingLength === 0)
+                    process.exit()
+                 })
+          })
+        })
+      }   
     } catch (e) {
       console.log("<<<", e, name)
     }

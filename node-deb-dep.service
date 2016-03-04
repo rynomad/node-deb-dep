@@ -10,6 +10,7 @@ WorkingDirectory=/usr/share/node-deb-dep
 RemainAfterExit=yes
 ExecReload=/bin/kill -HUP $MAINPID
 User=node-deb-dep
+ExecStart=/usr/bin/echo "hello"
 ExecStartPre=/usr/share/node-deb-dep/app/mounter.sh
 ExecStartPre=/bin/mkdir -p /run/node-deb-dep
 ExecStartPre=/bin/chown node-deb-dep:node-deb-dep /run/node-deb-dep
