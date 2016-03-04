@@ -72,9 +72,9 @@ const traverse = (cwd, node, name) => {
   if (name)
     install(cwd, node, name)
   else 
-    Object.keys(node.dependencies).forEach((key) => fs.mkdirRecursiveSync(cwd + "/node_modules/" + key))
+    Object.keys(node.dependencies).forEach((key) => fs.mkdirRecursiveSync(path.join(cwd , "/node_modules/" , key)))
   if (node.dependencies)
-    Object.keys(node.dependencies).forEach((key) => traverse( cwd + "/node_modules/" + key, node.dependencies[key], key))
+    Object.keys(node.dependencies).forEach((key) => traverse( path.join(cwd , "/node_modules/" , key), node.dependencies[key], key))
 }
 let j = 0;
 traverse(app_dir, shrinkwrap)
