@@ -1,7 +1,8 @@
 {
   "name": "node-deb-dep",
   "version": "1.0.0",
-  "description": "",
+  "description": "node debian package manager",
+  "maintainer": "Ryan Bennett",
   "main": "installer.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,7 +11,8 @@
   "license": "ISC",
   "node_deb": {
     "start_command": "nodejs index.js $*",
-    "systemd_service" : "./node-deb-dep.service"
+    "systemd_service": "./node-deb-dep.service",
+    "maintainer" : "Ryan Bennett"
   },
   "dependencies": {
     "fs-reverse": "0.0.2",
@@ -18,7 +20,7 @@
     "git-clone": "^0.1.0",
     "gunzip-maybe": "^1.3.1",
     "jsonfile": "^2.2.3",
-    "minimist": "^1.2.0",
+    "minimist": "https://registry.npmjs.org/minimist/-/minimist-1.2.0.tgz",
     "mkdir-p": "0.0.7",
     "promise-queue": "^2.2.3",
     "request": "^2.69.0",

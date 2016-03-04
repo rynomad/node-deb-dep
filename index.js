@@ -40,6 +40,9 @@ let i = 0
 
 var modules = new Map();
 var mountpoints = []
+fs.mkdirRecursiveSync(app_dir + shrinkwrap.name + "/node_modules")
+fs.mkdirRecursiveSync(mounts_dir)
+fs.mkdirRecursiveSync(modules_dir)
 
 var mountfile = fss.createWriteStream( path.join(mounts_dir , shrinkwrap.name + ".mount"))
 var umountfile = fss.createWriteStream( path.join(mounts_dir , shrinkwrap.name + ".umount"))
@@ -73,8 +76,7 @@ const traverse = (cwd, node, name) => {
     Object.keys(node.dependencies).forEach((key) => traverse( cwd + "/node_modules/" + key, node.dependencies[key], key))
 }
 let j = 0;
-fs.mkdirRecursiveSync(app_dir + shrinkwrap.name + "/node_modules")
-traverse(app_dir + shrinkwrap.name, shrinkwrap)
+traverse(app_dir, shrinkwrap)
 console.log(modules.size)
 
 for (var mod of modules){
