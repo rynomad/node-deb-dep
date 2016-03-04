@@ -20,6 +20,8 @@ const http = require("https")
 const spawn = require('child_process').spawn;
 const Queue = require("promise-queue")
 var queue = new Queue(5)
+
+
 const npm_install = (path) => () => new Promise((res, rej) => {
   let installer = spawn("npm", ["install", "--production"], {
     cwd : path
@@ -37,6 +39,8 @@ const npm_install = (path) => () => new Promise((res, rej) => {
       res()
   })
 })
+
+
 let i = 0
 
 var modules = new Map();
@@ -94,17 +98,29 @@ for (var mod of modules){
     let version = node.version.split('.')
     let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
     let localH = url.indexOf('http:') === 0 ? require('http') : http
-    //console.log("get?")
+    console.log("node-deb-dep fetch ", url)
     if (url.indexOf("git") === 0){
       let repo = url.split("+")[1]
       let commit = repo.split("#")[1]
       repo = repo.split("#")[0]
-      clone(repo, installpath + "/package", {checkout : commit}, postFetch)
+      queue.add(() => new Promise((res, rej) => {
+        clone(repo, installpath + "/package", {checkout : commit}, () => {
+          res()
+          postFetch()
+        })
+      }))
+      
     } else {
-      request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', postFetch).on('error', (err) => {
-      //console.log("er", node.resolved )
-      failures.push("!GET: " + installpath)
-    })
+      queue.add(() => new Promise((res, rej) => {
+        request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
+          res()
+          postFetch()
+        })).on('error', (err) => {
+          failures.push("!GET: " + installpath)
+          rej(err)
+        })
+
+      })
 
     }
 
@@ -121,32 +137,19 @@ for (var mod of modules){
           })
        	} catch(e){}
 
-        if (node.dependencies){
-          Object.keys(node.dependencies).forEach((dep) => {
-            fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
-          })
-        } 
-
-        jsonfile.readFile(installpath + "/package/package.json", (err, json) => {
-          if (err){
-            return failures.push("READPKG: " + installpath)
+        queue.add(npm_install(path.join(installpath , "package")))
+         .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
+         .then(() => {
+          console.log("node-deb-dep clean: ", installpath)
+          fs.rmrfSync( path.join(installpath, "package", "node_modules") )
+          if (node.dependencies){
+            Object.keys(node.dependencies).forEach((dep) => {
+              fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+            })
           }
-
-          json.dependencies = {};
-          json.devDependencies = {};
-          jsonfile.writeFile(installpath + "/package/package.json", json, (err) => {
-            if (err)
-              return failures.push("WRTPKG: " + installpath)
-            j++;
-            //console.log("queue install", installpath)
-            queue.add(npm_install(installpath + "/package"))
-                 .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
-                 .then(() => {
-                  if (queue.getQueueLength + queue.getPendingLength === 0)
-                    process.exit()
-                 })
-          })
-        })
+          if (queue.getQueueLength + queue.getPendingLength === 0)
+            process.exit()
+         })
       }   
     } catch (e) {
       console.log("<<<", e, name)
