@@ -115,7 +115,7 @@ for (var mod of modules){
         request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
           res()
           postFetch()
-        })).on('error', (err) => {
+        }).on('error', (err) => {
           failures.push("!GET: " + installpath)
           rej(err)
         })
