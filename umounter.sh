@@ -7,6 +7,6 @@ do
   # take action on each file. $f store current file name
   while read src target ; do 
 #    echo $src $target
-    umount $mounts
+    umount $target
   done < $file
 done

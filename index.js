@@ -24,6 +24,7 @@ const npm_install = (path) => () => new Promise((res, rej) => {
   let installer = spawn("npm", ["install", "--production"], {
     cwd : path
   })
+  console.log("node-deb-dep install:", path)
   installer.on('error', (err) => {
     rej(err)
   })
@@ -51,7 +52,7 @@ const install = (cwd, node, name) => {
   let installpath = path.join(modules_dir , name , node.version.split(".").join("/") )
   ++i;
   fs.mkdirRecursiveSync(installpath)
-  console.log("add mount")
+  //console.log("add mount")
   mountpoints.push(cwd)
   mountfile.write(path.join(installpath , "/package") + " " + cwd + "\n")
   modules.set(installpath, Object.assign(node,{name : name} ))
