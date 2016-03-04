@@ -1,5 +1,5 @@
 #!/bin/bash
-FILES=/etc/node-deb-dep/mounts/
+FILES=/etc/node-deb-dep/mounts/*.mount
 for file in $FILES
 do
   echo "setting mounts for $file file..."
