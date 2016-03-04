@@ -19,7 +19,7 @@ const gunzip = require("gunzip-maybe")
 const http = require("https")
 const spawn = require('child_process').spawn;
 const Queue = require("promise-queue")
-var queue = new Queue(5)
+var queue = new Queue(process.arch === "arm" ? 1 : 5)
 
 
 const npm_install = (path) => () => new Promise((res, rej) => {
