@@ -76,7 +76,7 @@ const traverse = (cwd, node, name) => {
     Object.keys(node.dependencies).forEach((key) => traverse( cwd + "/node_modules/" + key, node.dependencies[key], key))
 }
 let j = 0;
-traverse(app_dir + shrinkwrap.name, shrinkwrap)
+traverse(app_dir, shrinkwrap)
 console.log(modules.size)
 
 for (var mod of modules){
