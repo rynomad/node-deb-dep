@@ -5,7 +5,7 @@ Description={{ node_deb_package_description }}
 Requires=network.target
 
 [Service]
-Type=simple
+Type=oneshot
 WorkingDirectory=/usr/share/{{ node_deb_package_name }}
 ExecStart=/usr/share/{{ node_deb_package_name }}/app/mounter.sh
 ExecReload=/bin/kill -HUP $MAINPID
