@@ -11,7 +11,9 @@
   "license": "ISC",
   "node_deb": {
     "start_command": "nodejs index.js $*",
-    "systemd_service" : "node-deb-dep.service"
+    "templates" : {
+      "systemd_service" : "node-deb-dep.service"
+    }
   },
   "dependencies": {
     "fs-reverse": "0.0.2",
