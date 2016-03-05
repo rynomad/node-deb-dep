@@ -17,7 +17,9 @@ const jsonfile = require('jsonfile')
 const tar = require('tar-fs')
 const gunzip = require("gunzip-maybe")
 const http = require("https")
-const spawn = require('child_process').spawn;
+const cp = require('child_process')
+const spawn = cp.spawn
+const exec = cp.execSync;
 const Queue = require("promise-queue")
 var queue = new Queue(process.arch === "arm" ? 1 : 5)
 
@@ -30,8 +32,8 @@ const npm_install = (path) => () => new Promise((res, rej) => {
   installer.on('error', (err) => {
     rej(err)
   })
-  //installer.stdout.pipe(process.stdout)
-  installer.stderr.on('data',() => {})
+  installer.stdout.pipe(process.stdout)
+  installer.stderr.pipe(process.stderr)
   installer.on('close', (code) => {
     if (code)
       rej(code)
@@ -65,8 +67,10 @@ const install = (cwd, node, name) => {
 var failures = []
 
 process.on('exit', (code) => {
-  console.log("failures", code)
-  console.log(failures)
+  if (!failures.length){
+    console.log("remounting")
+    exec('./postinst.sh')
+  }
   process.exit()
 })
 
@@ -146,10 +150,10 @@ for (var mod of modules){
           fs.rmrfSync( path.join(installpath, "package", "node_modules") )
           if (node.dependencies){
             Object.keys(node.dependencies).forEach((dep) => {
-              fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+              fs.mkdirRecursiveSync(path.join(installpath , "/package/node_modules/" , dep))
             })
           } else {
-            fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
+            fs.mkdirRecursiveSync(path.join(installpath , "/package/node_modules"))
           }
           if (queue.getQueueLength + queue.getPendingLength === 0)
             process.exit()
