@@ -98,12 +98,13 @@ for (var mod of modules){
     let version = node.version.split('.')
     let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
     let localH = url.indexOf('http:') === 0 ? require('http') : http
-    console.log("node-deb-dep fetch ", url)
+
     if (url.indexOf("git") === 0){
       let repo = url.split("+")[1]
       let commit = repo.split("#")[1]
       repo = repo.split("#")[0]
       queue.add(() => new Promise((res, rej) => {
+        console.log("node-deb-dep fetch ", url)
         clone(repo, installpath + "/package", {checkout : commit}, () => {
           res()
           postFetch()
@@ -112,6 +113,7 @@ for (var mod of modules){
       
     } else {
       queue.add(() => new Promise((res, rej) => {
+        console.log("node-deb-dep fetch ", url)
         request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
           res()
           postFetch()
@@ -120,7 +122,7 @@ for (var mod of modules){
           rej(err)
         })
 
-      })
+      }))
 
     }
 
@@ -146,6 +148,8 @@ for (var mod of modules){
             Object.keys(node.dependencies).forEach((dep) => {
               fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
             })
+          } else {
+            fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + dep)
           }
           if (queue.getQueueLength + queue.getPendingLength === 0)
             process.exit()
