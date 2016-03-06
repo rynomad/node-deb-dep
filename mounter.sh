@@ -1,4 +1,8 @@
 #!/bin/bash
+if [ ! -d "/etc/node-deb-dep/mounts" ]; then
+  exit 0;
+  # Control will enter here if $DIRECTORY doesn't exist.
+fi
 FILES=/etc/node-deb-dep/mounts/*.mount
 for file in $FILES
 do
