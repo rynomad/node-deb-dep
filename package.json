@@ -1,6 +1,6 @@
 {
   "name": "node-deb-dep",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "node debian module dependencies",
   "main": "installer.js",
   "scripts": {
