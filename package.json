@@ -11,6 +11,7 @@
   "license": "ISC",
   "node_deb": {
     "start_command": "nodejs index.js $*",
+    "maintainer": "Ryan Bennett",
     "templates" : {
       "systemd_service" : "node-deb-dep.service"
     }
