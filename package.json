@@ -1,8 +1,7 @@
 {
   "name": "node-deb-dep",
   "version": "1.0.2",
-  "description": "",
-  ""
+  "description": "node debian module dependencies",
   "main": "installer.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
