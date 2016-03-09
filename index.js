@@ -100,7 +100,7 @@ const installNodeModules = (paths) => {
           let installer = spawn("npm", ["run", `${prefix}install`, "--production", "--unsafe-perm"], {
             cwd : pth
           })
-          console.log(`node-deb-dep ${prefix}install`:, path)
+          console.log(`node-deb-dep ${prefix}install: `, path)
           installer.on('error', (err) => {
             rej(err)
           })
