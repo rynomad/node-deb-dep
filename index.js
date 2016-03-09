@@ -86,16 +86,14 @@ let j = 0;
 traverse(app_dir, shrinkwrap)
 console.log(modules.size)
 
-for (var mod of modules){
-  let installpath = mod[0]
-    , node = mod[1]
-    , name = node.name;
+modules.forEach((node, installpath) => {
+  let name = node.name;
   try {
     //console.log("try", modules.size)
      require(installpath + "/package/package.json")
 
   } catch (e){
-  try {
+    try {
     //console.log("???")
     let version = node.version.split('.')
     let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
@@ -133,13 +131,13 @@ for (var mod of modules){
       function postFetch () {
           //console.log("?", installpath)
           //fs.copyRecursiveSync(installpath + "/package", installpath)
-      	try {
-      	  fss.readdirSync(installpath).forEach((path) => {
-        	  if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
+        try {
+          fss.readdirSync(installpath).forEach((path) => {
+            if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
               fss.renameSync(installpath + "/" + path, installpath + "/package")
-        	  }
+            }
           })
-       	} catch(e){}
+        } catch(e){}
 
         queue.add(npm_install(path.join(installpath , "package")))
          .catch((er) => failures.push("INSTALL: " + installpath + er + er.stack))
@@ -150,7 +148,7 @@ for (var mod of modules){
             Object.keys(node.dependencies).forEach((dep) => {
               let mkpath = path.join(installpath , "/package/node_modules/" , dep)
               console.log("node-deb-dep make mount point", mkpath)
-              fs.mkdirRecursiveSync(mkpath)
+              fs.mkdirRecursiveSync(mkpath) 
             })
           } else {
             fs.mkdirRecursiveSync(path.join(installpath , "/package/node_modules"))
@@ -162,7 +160,8 @@ for (var mod of modules){
     }
 
   }
-}
+})
+
 
 while (mountpoints.length){
   umountfile.write(mountpoints.pop() + "\n")
