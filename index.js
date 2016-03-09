@@ -79,8 +79,6 @@ process.on('uncaughtException', (er) => console.log(er.stack))
 const traverse = (cwd, node, name) => {
   if (name)
     install(cwd, node, name)
-  else 
-    Object.keys(node.dependencies).forEach((key) => fs.mkdirRecursiveSync(path.join(cwd , "/node_modules/" , key)))
   if (node.dependencies)
     Object.keys(node.dependencies).forEach((key) => traverse( path.join(cwd , "/node_modules/" , key), node.dependencies[key], key))
 }
@@ -108,7 +106,7 @@ for (var mod of modules){
       let commit = repo.split("#")[1]
       repo = repo.split("#")[0]
       queue.add(() => new Promise((res, rej) => {
-        console.log("node-deb-dep fetch ", url)
+        console.log("node-deb-dep git fetch ", url)
         clone(repo, installpath + "/package", {checkout : commit}, () => {
           res()
           postFetch()
@@ -117,7 +115,7 @@ for (var mod of modules){
       
     } else {
       queue.add(() => new Promise((res, rej) => {
-        console.log("node-deb-dep fetch ", url)
+        console.log("node-deb-dep http fetch ", url)
         request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(installpath)).on('finish', () => {
           res()
           postFetch()
@@ -150,13 +148,13 @@ for (var mod of modules){
           fs.rmrfSync( path.join(installpath, "package", "node_modules") )
           if (node.dependencies){
             Object.keys(node.dependencies).forEach((dep) => {
-              fs.mkdirRecursiveSync(path.join(installpath , "/package/node_modules/" , dep))
+              let mkpath = path.join(installpath , "/package/node_modules/" , dep)
+              console.log("node-deb-dep make mount point", mkpath)
+              fs.mkdirRecursiveSync(mkpath)
             })
           } else {
             fs.mkdirRecursiveSync(path.join(installpath , "/package/node_modules"))
           }
-          if (queue.getQueueLength + queue.getPendingLength === 0)
-            process.exit()
          })
       }   
     } catch (e) {
