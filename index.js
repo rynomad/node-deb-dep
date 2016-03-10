@@ -29,30 +29,39 @@ const makeInstallpath = (node, name) => path.join("/etc/node-deb-dep/node_module
 
 const fetchNodeModules = (node, name) => {
   out(".")
-  if (name && !fs.existsSync(makeInstallpath(node, name))){
+  if (name && !fs.existsSync(path.join(makeInstallpath(node, name), "package", "fetch.ndd"))){
     queue.add(() => new Promise((res, rej) => {
       let version = node.version.split('.')
       let url = node.resolved || `https://registry.npmjs.org/${name}/-/${name}-${version[0]}.${version[1]}.${version[2]}.tgz`
       let installpath = makeInstallpath(node, name);
 
-      console.log("node-deb-dep fetch ", url)
+      out("^")
       if (url.indexOf("git") === 0){
         let repo = url.split("+")[1]
         let commit = repo.split("#")[1]
         repo = repo.split("#")[0]
         clone(repo, path.join(makeInstallpath(node, name), "package"), {checkout : commit}, () => {
           fs.rmrfSync(path.join(makeInstallpath(node, name), "package", ".git"))
+          fs.writeFileSync(path.join(installpath, "package", "fetch.ndd"), "true")
           res()
         })
       } else {
         request(url).on('error', (e) => failures.push(e)).pipe(gunzip()).pipe(tar.extract(makeInstallpath(node, name))).on('finish', () => {
           fs.readdirSync(makeInstallpath(node, name)).forEach((path) => {
             if (path.toLowerCase().indexOf(name.toLowerCase()) > -1){
+              fs.rmrfSync(installpath + "/package")
               fs.renameSync(installpath + "/" + path, installpath + "/package")
+              if (node.dependencies)
+                Object.keys(node.dependencies).forEach((key) => {
+                  fs.mkdirRecursiveSync(installpath + "/package/node_modules/" + key)
+                })
             }
           })
+          process.nextTick(() => {
+            fs.writeFileSync(path.join(installpath, "package", "fetch.ndd"), "true")
+            res()
+          })
 
-          res()
         }).on('error', (err) => {
           rej(err)
         })
@@ -67,19 +76,24 @@ const fetchNodeModules = (node, name) => {
   }
 }
 
+
+var tmpmount = fs.createWriteStream("/tmp/" + shrinkwrap.name + ".mount.sh")
+tmpmount.write("#!/bin/bash")
+var tmpumount = fs.createWriteStream("/tmp/" + shrinkwrap.name + ".umount.sh")
+tmpumount.write("#!/bin/bash")
+
+
 const makeTempMounts = (node, targets, sources, parentnode, parentname, name) => {
   out(".")
 
-  if (name && parentname && !fs.existsSync(makeInstallpath(node, name))){
+  if (name && parentname && !fs.existsSync(path.join(makeInstallpath(node, name), "package", "installed.ndd"))){
+    out("|");
     var target = path.join(makeInstallpath(parentnode, parentname),"package", "node_modules", name);
     var source = path.join(makeInstallpath(node, name),"package");
     targets.push(target);
     sources.push(source);
-    queue.add(() => new Promise((res, rej) => {
-      fs.mkdirRecursiveSync(target)
-      exec(`mount --bind ${source} ${target}`)
-      res()
-    }))
+    fs.mkdirRecursiveSync(target);
+    tmpmount.write(`\nmount --bind ${source} ${target};`)
   }
 
   if (node.dependencies){
@@ -92,52 +106,61 @@ const makeTempMounts = (node, targets, sources, parentnode, parentname, name) =>
 const installNodeModules = (paths) => {
   out('.')
   paths.reverse().forEach((pth) => {
-    let pkg = require(path.join(pth,"package.json"))
-    (["pre", "", "post"]).forEach((prefix) => {
-      if (pkg.scripts && pkg.scripts[`${prefix}install`]){
-        queue.add(() => new Promise((res, rej) => {
+    queue.add(() => new Promise((res, rej) => {
+      //console.log("\ncheck install", pth)
+      var pkg = require(path.join(pth,"package.json"))
+      var interior = Promise.resolve();
+      out("~");
+      (["pre", "", "post"]).forEach((prefix) => {
+        out(".");
+        if (pkg.scripts && pkg.scripts[`${prefix}install`]){
+          interior = interior.then(() => new Promise((res, rej) => {
+            out("|")
+            let installer = spawn("npm", ["run", `${prefix}install`, "--production", "--unsafe-perm"], {
+              cwd : pth
+            })
+            //console.log(`node-deb-dep ${prefix}install: `, pth)
+            installer.on('error', (err) => {
+              rej(err)
+            })
+            //installer.stdout.pipe(process.stdout)
+            installer.stderr.pipe(process.stderr)
+            installer.on('close', (code) => {
+              if (code)
+                rej(code)
+              else
+                res()
+            })
+          })).catch((er) => console.log("interior install err", er, er.stack))
+        } 
+      })
 
-          let installer = spawn("npm", ["run", `${prefix}install`, "--production", "--unsafe-perm"], {
-            cwd : pth
-          })
-          console.log(`node-deb-dep ${prefix}install: `, path)
-          installer.on('error', (err) => {
-            rej(err)
-          })
-          installer.stdout.pipe(process.stdout)
-          installer.stderr.pipe(process.stderr)
-          installer.on('close', (code) => {
-            if (code)
-              rej(code)
-            else
-              res()
-          })
-        }))
-      }
-      
-    })
-
+      interior.then(() => {
+        out("#")
+        res()
+      })
+    }))
   })
 }
 
 const cleanTempMounts = (paths) => {
-  out(".")
   paths.reverse().forEach(path => {
-    queue.add(() => new Promise((res, rej) => {
-      exec('umount ' + path)
-      res()
-    }))
+    out(".")
+    tmpumount.write(`\numount ${path};\n`)
   })
 }
 
 const makeMountPoints = (node, name) => {
   out(".")
-  if (name && !fs.existsSync(path.join(makeInstallpath(node, name))))
+  if (name)
     queue.add(() => new Promise((res, rej) => {
+      out(".")
+      fs.writeFileSync(path.join(makeInstallpath(node, name),"package", "installed.ndd"), "true")
       if (node.dependencies)
         Object.keys(node.dependencies).forEach((key) => {
           fs.mkdirRecursiveSync('/etc/node-deb-dep/node_modules/' + name + '/' + node.version.split(".").join("/") + "/package/node_modules/" + key)
         })
+      res()
     }))
   if (node.dependencies){
     Object.keys(node.dependencies).forEach((key) => {
@@ -150,7 +173,9 @@ const makeMountPoints = (node, name) => {
 
 const makeMountFile = (node, wd, stream, rev, name) => {
   if (name){
-    stream.write(makeInstallpath(node, name) + "/package " + wd + "\n")
+    let src = path.join(makeInstallpath(node, name) , "package")
+    stream.write(`/bin/mount --bind --make-slave ${src} ${wd}\n`)
+    stream.write(`/bin/mount -o remount,ro,bind ${src} ${wd}\n`)
     rev.push(wd)
   }
   if (node.dependencies){
@@ -160,10 +185,10 @@ const makeMountFile = (node, wd, stream, rev, name) => {
   }
 }
 
-const makeUMountFile = (name, rev) => {
-  var stream = fs.createWriteStream('/etc/node-deb-dep/mounts/' + name + ".umount")
+const makeUMountFile = (name, rev, umountStream) => {
+  umountStream.write("#!/bin/bash\n")
   while (rev.length){
-    stream.write(rev.pop() + "\n")
+    umountStream.write("umount " + rev.pop() + "\n")
   }
 }
 
@@ -173,24 +198,55 @@ queue.add(() => new Promise((res,rej) => {
   console.log("\nmakeTempMounts")
   var targets = [], sources = []
   makeTempMounts(shrinkwrap, targets, sources)
+  queue.add(() => new Promise((res, rej) => {
+    tmpmount.end("\n", () => {
+      console.log("execute mount (LONG)")
+      fs.chmodSync("/tmp/" + shrinkwrap.name + ".mount.sh", '755');
+      exec("/tmp/" + shrinkwrap.name + ".mount.sh")
+      fs.rmrfSync("/tmp/" + shrinkwrap.name + ".mount.sh")
+      res()
+    })
+  }))
+
   console.log("\ninstallNodeModules(shrinkwrap)")
   installNodeModules(sources)
   console.log("\ncleanNodeModules(shrinkwrap)")
   cleanTempMounts(targets)
+  queue.add(() => new Promise((res, rej) => {
+    tmpumount.end("\n", () => {
+      console.log("excecute umount (LONG)")
+      fs.chmodSync("/tmp/" + shrinkwrap.name + ".umount.sh", '755');
+      exec("/tmp/" + shrinkwrap.name + ".umount.sh")
+      fs.rmrfSync("/tmp/" + shrinkwrap.name + ".umount.sh")
+      res()
+    })
+  }))
   console.log("\nmakeMountPoints(shrinkwrap)")
   makeMountPoints(shrinkwrap)
 
   var umount = []
-  makeMountFile(shrinkwrap, '/usr/share/' + shrinkwrap.name + "/app", fs.createWriteStream('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".mount"), umount )
-  makeUMountFile(shrinkwrap.name, umount)
-  res()
+  var mountStream = fs.createWriteStream('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".mount")
+  mountStream.write("#!/bin/bash\n")
+  var umountStream = fs.createWriteStream('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".umount")
+  makeMountFile(shrinkwrap, '/usr/share/' + shrinkwrap.name + "/app", mountStream, umount )
+  makeUMountFile(shrinkwrap.name, umount, umountStream)
+  umountStream.end("\n", () => {
+    mountStream.end("\n", () => {
+      fs.chmodSync('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".mount", '755');
+      fs.chmodSync('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".umount", '755');
+      res()
+    })
+  })
+
 })).then(() => {
   console.log("\nbegin processing queue")
   queue.add(() => new Promise((res, rej) => {
     console.log("exec postinst")
     exec('./postinst.sh')
+    exec('/etc/node-deb-dep/mounts/' + shrinkwrap.name + ".mount")
+    res()
   }))
-})
+}).catch(er => console.log(er, er.stack))
 
 
 
