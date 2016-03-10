@@ -4,7 +4,7 @@ if [ ! -d "/etc/node-deb-dep/mounts" ]; then
   # Control will enter here if $DIRECTORY doesn't exist.
 fi
 
-for SCRIPT in /path/to/scripts/dir/*.umount
+for SCRIPT in /etc/node-deb-dep/mounts/*.umount
 do
   if [ -f $SCRIPT -a -x $SCRIPT ]
   then
